@@ -2,6 +2,7 @@
 #define CONNECTION_H
 
 #include "sensor_list.h"
+#include "log.h"
 
 typedef struct
 {

@@ -51,3 +51,32 @@ void sensor_list_print(sensor_list_t *list)
 
     pthread_mutex_unlock(&list->mutex);
 }
+
+int sensor_list_pop(sensor_list_t *list,
+                    int *sensor_id,
+                    double *value)
+{
+    pthread_mutex_lock(&list->mutex);
+
+    if(list->head == NULL)
+    {
+        pthread_mutex_unlock(&list->mutex);
+
+        return 0;
+    }
+
+    sensor_node_t *temp =
+        list->head;
+
+    *sensor_id = temp->sensor_id;
+
+    *value = temp->value;
+
+    list->head = temp->next;
+
+    free(temp);
+
+    pthread_mutex_unlock(&list->mutex);
+
+    return 1;
+}

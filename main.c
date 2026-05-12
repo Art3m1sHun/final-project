@@ -9,19 +9,18 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 
 #include "log.h"
 #include "sensor_list.h"
 #include "connection.h"
+#include "database.h"
 
+#include <errno.h>
 
-
+pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_t thread_ecg, thread_ppg;
-
-pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
-
-
 
 static void *sensor_client(void *args)
 {
@@ -37,6 +36,7 @@ static void *sensor_client(void *args)
     free(client);
 
     char buffer[128];
+    int sensor_id = -1;
 
     while(1)
     {
@@ -47,20 +47,25 @@ static void *sensor_client(void *args)
 
         if(n <= 0)
         {
-            printf("Sensor disconnected\n");
+            char disconnect_msg[64];
+            if (sensor_id != -1) {
+                // Nếu đã từng nhận được dữ liệu, ta biết ID là gì
+                sprintf(disconnect_msg, "Sensor %d disconnected", sensor_id);
+            } else {
+                // Nếu chưa kịp gửi dữ liệu đã ngắt kết nối
+                sprintf(disconnect_msg, "Unknown sensor disconnected (fd: %d)", client_fd);
+            }
 
-            write_log("Sensor disconnected");
-
+            printf("%s\n", disconnect_msg);
+            write_log(disconnect_msg); // Ghi log có chứa ID
             break;
         }
 
         buffer[n] = '\0';
 
-        int sensor_id;
-
         double value;
 
-        sscanf(buffer, "%d %lf", &sensor_id, &value);
+        if (sscanf(buffer, "%d %lf", &sensor_id, &value) == 2){
         sensor_list_insert(list, sensor_id, value);
 
         sensor_list_print(list);
@@ -68,6 +73,7 @@ static void *sensor_client(void *args)
         printf("Received: %s\n", buffer);
 
         write_log(buffer);
+        }
     }
 
     close(client_fd);
@@ -132,22 +138,98 @@ void* connection(void *args)
 
 static void *data (void *args)
 {
-    sensor_list_t *list =(sensor_list_t*) args;
+    //sensor_list_t *list =(sensor_list_t*) args;
 
-    sensor_list_insert(list, 1, 25.5);
+    //sensor_list_insert(list, 1, 25.5);
 
     write_log("data inserted");
 
     return NULL;
 }
 
-static void *storage (void *args)
+static void *storage(void *args)
 {
-    sensor_list_t *list =(sensor_list_t*) args;
+    sensor_list_t *list =
+        (sensor_list_t*) args;
 
-    sensor_list_insert(list, 2, 25.5);
+    int retry = 0;
 
-    write_log("storage inserted");
+    sqlite3 *db = NULL;
+
+    //--------------------------------
+    // CONNECT DATABASE
+    //--------------------------------
+
+    while(retry < 3)
+    {
+        db = db_connect();
+
+        if(db != NULL)
+        {
+            printf("Database connected\n");
+
+            write_log("Database connected");
+
+            break;
+        }
+
+        retry++;
+
+        printf("DB connect failed. Retry %d\n",
+               retry);
+
+        write_log("DB connect failed");
+
+        sleep(3);
+    }
+
+    //--------------------------------
+    // FAIL AFTER 3 ATTEMPTS
+    //--------------------------------
+
+    if(db == NULL)
+    {
+        printf("Gateway shutting down\n");
+
+        write_log("Gateway shutting down");
+
+        exit(1);
+    }
+
+    //--------------------------------
+    // STORAGE LOOP
+    //--------------------------------
+
+    while(1)
+    {
+        int sensor_id;
+
+        double value;
+
+        int ok =
+            sensor_list_pop(list,
+                            &sensor_id,
+                            &value);
+
+        if(ok)
+        {
+            printf("Store DB: %d %.2f\n",
+                   sensor_id,
+                   value);
+
+            db_insert(db,
+                      sensor_id,
+                      value);
+
+            write_log("Data inserted to DB");
+        }
+        else
+        {
+            sleep(1);
+        }
+    }
+
+    sqlite3_close(db);
 
     return NULL;
 }
@@ -157,7 +239,12 @@ int main(int argc, char *argv[])
 {
     if(mkfifo(FIFO_NAME, 0666) < 0)
     {
-        perror("mkfifo");
+        if(errno != EEXIST)
+        {
+            perror("mkfifo");
+
+            exit(1);
+        }
     }
 
 
@@ -255,15 +342,28 @@ int main(int argc, char *argv[])
                 perror("open fifo");
                 exit(1);
             }
-
+            int sequence = 1;
+            
             while(1)
             {
                 int n = read(fd, buffer, sizeof(buffer));
+                
 
                 if(n > 0)
                 {
-                    fprintf(logfile, "%s\n", buffer);
+                    time_t now = time(NULL);
+
+                    struct tm *t = localtime(&now);
+
+                    char time_str[16];
+
+                    strftime(time_str, sizeof(time_str), "%H:%M:%S", t);
+
+                    fprintf(logfile, "%d %s %s\n", sequence, time_str, buffer);
+
                     fflush(logfile);
+
+                    sequence++;
                 }
             }
             fclose(logfile);
@@ -271,8 +371,6 @@ int main(int argc, char *argv[])
         
             connection_arg_t conn_arg;
             conn_arg.server_fd = server_fd;
-
-
 
             conn_arg.server_fd = server_fd;
 
