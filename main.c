@@ -27,9 +27,10 @@ pthread_t thread_ecg, thread_ppg;
 
 sensor_list_t *global_list;
 sensor_list_t shared_list;
-sensor_list_t filtered_list;  
+sensor_list_t filtered_list;    // data sau khi filter
 
 struct timespec start_time;
+struct timespec log_start_time;
 
 volatile int running = 1;
 volatile int logger_running = 1;
@@ -37,7 +38,7 @@ volatile int logger_running = 1;
 int global_server_fd;
 int acquisition_started = 0;
 
-double filter_ecg(double x) // co the filter data o day
+double filter_ecg(double x)
 {
     static double y = 0;
 
@@ -46,7 +47,7 @@ double filter_ecg(double x) // co the filter data o day
     return y;
 }
 
-double filter_ppg(double x) // co the filter data o day
+double filter_ppg(double x)
 {
     static double y = 0;
 
@@ -93,19 +94,24 @@ static void *sensor_client(void *args)
 
     while(running)
     {
-        int n = recv(client_fd, buffer, sizeof(buffer)-1, 0);
+        int n = recv(client_fd,
+                     buffer,
+                     sizeof(buffer)-1,
+                     0);
 
         if(n <= 0)
         {
             char disconnect_msg[64];
             if (sensor_id != -1) {
+                // Nếu đã từng nhận được dữ liệu, ta biết ID là gì
                 sprintf(disconnect_msg, "Sensor %d disconnected", sensor_id);
             } else {
+                // Nếu chưa kịp gửi dữ liệu đã ngắt kết nối
                 sprintf(disconnect_msg, "Unknown sensor disconnected (fd: %d)", client_fd);
             }
 
             printf("%s\n", disconnect_msg);
-            write_log(disconnect_msg);
+            write_log(disconnect_msg); // Ghi log có chứa ID
             break;
         }
 
@@ -328,9 +334,12 @@ int main(int argc, char *argv[])
     pthread_t storage_thread;
 
     global_list = &shared_list;
+
     sensor_list_init(&shared_list);
     sensor_list_init(&filtered_list);
+
     clock_gettime(CLOCK_MONOTONIC, &start_time);
+    clock_gettime(CLOCK_MONOTONIC,&log_start_time);
 
 
 
@@ -452,9 +461,6 @@ int main(int argc, char *argv[])
 
                     if(n > 0)
                     {
-                        struct timespec ts;
-
-                        clock_gettime(CLOCK_REALTIME, &ts);
                         buffer[n] = '\0';
 
                         char *line =
@@ -464,18 +470,26 @@ int main(int argc, char *argv[])
                         {
                             if(strlen(line) > 0)
                             {
-                                struct timespec ts;
+                                struct timespec now;
 
-                                clock_gettime(CLOCK_REALTIME,
-                                            &ts);
+                                clock_gettime(CLOCK_MONOTONIC,
+                                            &now);
 
-                                fprintf(logfile,
-                                        "%d %ld.%09ld %s\n",
-                                        sequence,
-                                        ts.tv_sec,
-                                        ts.tv_nsec,
-                                        line);
+                                time_t sec =
+                                    now.tv_sec - log_start_time.tv_sec;
 
+                                long nsec =
+                                    now.tv_nsec - log_start_time.tv_nsec;
+
+                                if(nsec < 0)
+                                {
+                                    sec--;
+
+                                    nsec += 1000000000L;
+                                }
+                                double elapsed = sec + nsec / 1e9;
+
+                                fprintf(logfile, "%d %.9f %s\n", sequence, elapsed, line);
                                 fflush(logfile);
 
                                 sequence++;

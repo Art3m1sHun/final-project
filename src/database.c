@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include "database.h"
+#include "log.h"
 
 sqlite3* db_connect()
 {
@@ -16,7 +17,7 @@ sqlite3* db_connect()
 
     if(rc)
     {
-        printf("Cannot open database\n");
+        write_log("Cannot open database\n");
 
         return NULL;
     }
@@ -54,7 +55,7 @@ void db_insert(sqlite3 *db,
                           &stmt,
                           NULL) != SQLITE_OK)
     {
-        printf("Prepare failed: %s\n",
+        write_log_format("Prepare failed: %s\n",
                sqlite3_errmsg(db));
 
         return;
@@ -76,7 +77,7 @@ void db_insert(sqlite3 *db,
 
     if(sqlite3_step(stmt) != SQLITE_DONE)
     {
-        printf("Insert failed: %s\n",
+        write_log_format("Insert failed: %s\n",
                sqlite3_errmsg(db));
     }
 
@@ -134,6 +135,6 @@ void db_export_session()
 
     fclose(dst);
 
-    printf("Database exported: %s\n",
+    write_log_format("Database exported: %s\n",
            filename);
 }
