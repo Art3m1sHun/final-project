@@ -41,18 +41,22 @@ GATEWAY_PID=$!
 
 sleep 2
 
-echo "Starting sensor..."
-
-setsid ./sensor 127.0.0.1 $PORT &
-
-SENSOR_PID=$!
-
-sleep 2
-
 echo "Starting plotter..."
 
 setsid python plot_data.py &
 
 PLOT_PID=$!
+
+#--------------------------------
+# WAIT GUI READY
+#--------------------------------
+
+sleep 5
+
+echo "Starting sensor..."
+
+setsid ./sensor 127.0.0.1 $PORT &
+
+SENSOR_PID=$!
 
 wait

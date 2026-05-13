@@ -30,9 +30,11 @@ sensor_list_t shared_list;
 sensor_list_t filtered_list;    // data sau khi filter
 
 struct timespec start_time;
+
 volatile int running = 1;
-int global_server_fd;
 volatile int logger_running = 1;
+
+int global_server_fd;
 int acquisition_started = 0;
 
 double filter_ecg(double x)

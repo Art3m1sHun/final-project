@@ -61,28 +61,33 @@ def fetch_thread():
         time.sleep(FETCH_INTERVAL)
 
 #--------------------------------
-# FIGURE — tắt mọi thứ không cần
+# FIGURE
 #--------------------------------
-fig, ax = plt.subplots(figsize=(10, 4))
-fig.patch.set_facecolor('black')
-ax.set_facecolor('black')
+fig, (ax_ecg, ax_ppg) = plt.subplots(2, 1, figsize=(10, 6))
+fig.patch.set_facecolor('white')
 
-# Dùng màu tương phản cao để render nhanh hơn
-line_ecg, = ax.plot([], [], color='lime',  lw=1, label="ECG")
-line_ppg, = ax.plot([], [], color='cyan',  lw=1, label="PPG")
+# --- ECG axes ---
+ax_ecg.set_facecolor('white')
+ax_ecg.set_title("ECG", color='black')
+ax_ecg.set_ylabel("Amplitude", color='black')
+ax_ecg.tick_params(colors='black')
+ax_ecg.set_xlim(0, WINDOW_SIZE)
+ax_ecg.grid(False)
 
-ax.set_xlabel("Sample", color='white')
-ax.set_ylabel("Amplitude", color='white')
-ax.set_title("Realtime ECG + PPG", color='white')
-ax.tick_params(colors='white')
-ax.legend(facecolor='gray')
-ax.grid(False)  # tắt grid — tốn CPU trên Pi
+# --- PPG axes ---
+ax_ppg.set_facecolor('white')
+ax_ppg.set_title("PPG", color='black')
+ax_ppg.set_ylabel("Amplitude", color='black')
+ax_ppg.set_xlabel("Sample", color='black')
+ax_ppg.tick_params(colors='black')
+ax_ppg.set_xlim(0, WINDOW_SIZE)
+ax_ppg.grid(False)
 
-# Pre-set xlim cố định, không tính lại mỗi frame
-ax.set_xlim(0, WINDOW_SIZE)
+line_ecg, = ax_ecg.plot([], [], color='red', lw=1)
+line_ppg, = ax_ppg.plot([], [], color='green', lw=1)
 
 #--------------------------------
-# UPDATE — chỉ set_data, không redraw axes
+# UPDATE
 #--------------------------------
 def update(frame):
     with buf_lock:
@@ -97,12 +102,10 @@ def update(frame):
     line_ecg.set_data(x, ecg)
     line_ppg.set_data(x, ppg)
 
-    # Chỉ update ylim khi cần (không gọi mỗi frame)
-    ymin = min(ecg.min(), ppg.min())
-    ymax = max(ecg.max(), ppg.max())
-    ax.set_ylim(ymin - 0.5, ymax + 0.5)
+    ax_ecg.set_ylim(ecg.min() - 0.5, ecg.max() + 0.5)
+    ax_ppg.set_ylim(ppg.min() - 0.5, ppg.max() + 0.5)
 
-    return line_ecg, line_ppg  # blit=True cần return artists
+    return line_ecg, line_ppg
 
 #--------------------------------
 # KHỞI ĐỘNG FETCH THREAD
