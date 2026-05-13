@@ -233,10 +233,6 @@ int main(int argc, char *argv[])
              buffer,
              strlen(buffer),
              0);
-
-        printf("ECG: %.6f V | PPG: %.6f V\n",
-               ecg,
-               ppg);
     }
 
     close(sock);
