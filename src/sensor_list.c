@@ -8,6 +8,7 @@
 void sensor_list_init(sensor_list_t *list)
 {
     list->head = NULL;
+    list->tail = NULL;
 
     pthread_mutex_init(&list->mutex, NULL);
 
@@ -32,10 +33,16 @@ void sensor_list_insert(sensor_list_t *list,
     node->ecg = ecg;
     node->ppg = ppg;
 
+    if(!acquisition_started)
+    {
+        clock_gettime(CLOCK_MONOTONIC, &start_time);
+
+        acquisition_started = 1;
+    }
     struct timespec now;
 
-    clock_gettime(CLOCK_MONOTONIC_RAW,
-                  &now);
+    clock_gettime(CLOCK_MONOTONIC,
+                &now);
 
     long sec =
         now.tv_sec - start_time.tv_sec;
@@ -49,14 +56,24 @@ void sensor_list_insert(sensor_list_t *list,
         nsec += 1000000000L;
     }
 
-    sprintf(node->timestamp,
+    snprintf(node->timestamp,
+            sizeof(node->timestamp),
             "%ld.%09ld",
             sec,
             nsec);
 
-    node->next = list->head;
+    node->next = NULL;
 
-    list->head = node;
+    if(list->tail == NULL)
+    {
+        list->head = node;
+        list->tail = node;
+    }
+    else
+    {
+        list->tail->next = node;
+        list->tail = node;
+    }
 
     pthread_cond_signal(&list->cond);
 
@@ -99,6 +116,10 @@ int sensor_list_pop(sensor_list_t *list, double *ecg, double *ppg, char *timesta
     sensor_node_t *node = list->head;
 
     list->head = node->next;
+    if(list->head == NULL)
+    {
+        list->tail = NULL;
+    }
 
     *ecg = node->ecg;
     *ppg = node->ppg;
