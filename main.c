@@ -175,7 +175,7 @@ static void *data (void *args)
 
     //sensor_list_insert(list, 1, 25.5);
 
-    write_log("data inserted");
+    //write_log("data inserted");
 
     return NULL;
 }
