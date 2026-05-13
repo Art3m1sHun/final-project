@@ -16,9 +16,10 @@ OBJ_DIR = obj
 OBJ = main.o $(OBJ_DIR)/sensor_list.o $(OBJ_DIR)/log.o $(OBJ_DIR)/database.o 
 
 TARGET = sensor_app
+TARGET2 = sensor
 
-# Luật mặc định
-all: $(OBJ_DIR) $(TARGET)
+# Luật mặc định — build cả hai target
+all: $(OBJ_DIR) $(TARGET) $(TARGET2)
 
 # Tạo thư mục obj nếu chưa có để giữ thư mục gốc sạch sẽ
 $(OBJ_DIR):
@@ -28,6 +29,14 @@ $(OBJ_DIR):
 # Thêm -lsqlite3 để liên kết thư viện SQLite 
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJ) -lsqlite3 
+
+# Biên dịch và liên kết read_sensor.c thành file thực thi sensor
+$(TARGET2): read_sensor.o
+	$(CC) $(CFLAGS) -o $(TARGET2) read_sensor.o
+
+# Cách biên dịch file read_sensor.c (ở thư mục gốc)
+read_sensor.o: read_sensor.c
+	$(CC) $(CFLAGS) -c read_sensor.c -o read_sensor.o
 
 # Cách biên dịch file main.c (ở thư mục gốc)
 main.o: main.c
@@ -41,6 +50,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 clean:
 	@echo "Stopping processes and cleaning files..."
 	-pkill -x $(TARGET) 
-	rm -rf $(OBJ_DIR) *.o $(TARGET) 
+	-pkill -x $(TARGET2)
+	rm -rf $(OBJ_DIR) *.o $(TARGET) $(TARGET2)
 	rm -f gateway.log 
 	@echo "Done!"
