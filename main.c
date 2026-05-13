@@ -10,7 +10,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <time.h>
-
+#include <signal.h>
 
 #include "log.h"
 #include "sensor_list.h"
@@ -21,6 +21,16 @@
 
 pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_t thread_ecg, thread_ppg;
+
+volatile int running = 1;
+int global_server_fd;
+
+void handle_sigint(int sig)
+{
+    running = 0;
+
+    close(global_server_fd);
+}
 
 static void *sensor_client(void *args)
 {
@@ -38,7 +48,7 @@ static void *sensor_client(void *args)
     char buffer[128];
     int sensor_id = -1;
 
-    while(1)
+    while(running)
     {
         int n = recv(client_fd,
                      buffer,
@@ -92,7 +102,7 @@ void* connection(void *args)
 
     sensor_list_t *shared_list = conn->shared_list;
 
-    while(1)
+    while(running)
     {
         printf("Waiting for sensor...\n");
 
@@ -106,11 +116,12 @@ void* connection(void *args)
                    (struct sockaddr*)&client_addr,
                    &client_len);
 
-        if(client_fd < 0)
-        {
-            perror("accept");
-
-            continue;
+        if(client_fd < 0){
+            if(running)
+            {
+                perror("accept");
+            }
+            break;
         }
 
         printf("New sensor connected!\n");
@@ -203,7 +214,7 @@ static void *storage(void *args)
     // STORAGE LOOP
     //--------------------------------
 
-    while(1)
+    while(running)
     {
         char sensor_type[16];
 
@@ -215,20 +226,17 @@ static void *storage(void *args)
         sensor_list_pop(list, sensor_type, &sensor_id, &value);
         if(ok)
         {
-            printf("Store DB: %d %.2f\n",
-                   sensor_id,
-                   value);
+            printf("Store DB: %d %.2f\n", sensor_id, value);
 
-            db_insert(db,
-                    sensor_type,
-                    sensor_id,
-                    value);
+            db_insert(db, sensor_type, sensor_id, value);
 
             write_log("Data inserted to DB");
-        }
-        else
-        {
-            sleep(1);
+        }else{
+            pthread_mutex_lock(&list->mutex);
+
+            pthread_cond_wait(&list->cond, &list->mutex);
+
+            pthread_mutex_unlock(&list->mutex);
         }
     }
 
@@ -258,7 +266,7 @@ int main(int argc, char *argv[])
     sensor_list_t shared_list;
     sensor_list_init(&shared_list);
 
-    
+
     
     int ret;
 
@@ -332,6 +340,7 @@ int main(int argc, char *argv[])
 
     if(pid_log >= 0){
         if(pid_log == 0){ // tiến trình ghi log
+            signal(SIGINT, handle_sigint);
             FILE *logfile = fopen("gateway.log", "a");
             if(logfile == NULL)
             {
@@ -347,7 +356,7 @@ int main(int argc, char *argv[])
             }
             int sequence = 1;
             
-            while(1)
+            while(running)
             {
                 int n = read(fd, buffer, sizeof(buffer));
                 
@@ -400,8 +409,16 @@ int main(int argc, char *argv[])
             pthread_join(connect_thread, NULL);
             pthread_join(data_thread, NULL);
             pthread_join(storage_thread, NULL);
+            printf("Graceful shutdown...\n");
+
+            write_log("Gateway shutting down");
+
+            kill(pid_log, SIGTERM);
+
+            unlink(FIFO_NAME);
 
             close(server_fd);
+
             sleep(1);
         }
     }else{

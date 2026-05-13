@@ -14,6 +14,7 @@ void write_log(const char *msg)
     //--------------------------------
     // LOCK FIFO
     //--------------------------------
+    
 
     pthread_mutex_lock(&log_mutex);
 

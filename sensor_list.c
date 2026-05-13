@@ -9,6 +9,8 @@ void sensor_list_init(sensor_list_t *list)
     list->head = NULL;
 
     pthread_mutex_init(&list->mutex, NULL);
+
+    pthread_cond_init(&list->cond, NULL);
 }
 
 void sensor_list_insert(sensor_list_t *list,
@@ -46,6 +48,8 @@ void sensor_list_insert(sensor_list_t *list,
     node->next = list->head;
 
     list->head = node;
+
+    pthread_cond_signal(&list->cond);
 
     pthread_mutex_unlock(&list->mutex);
 }

@@ -21,6 +21,8 @@ typedef struct
 
     pthread_mutex_t mutex;
 
+    pthread_cond_t cond;
+
 } sensor_list_t;
 
 void sensor_list_init(sensor_list_t *list);
