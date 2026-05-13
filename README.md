@@ -388,6 +388,4 @@ This project is suitable for learning:
 # Author
 
 * Nguyen Minh Hung
-* Computer Engineering Student
-* Embedded Software & Linux Systems Enthusiast
 * email: minhhungdenguyn052@gmail.com
