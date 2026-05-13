@@ -455,23 +455,37 @@ int main(int argc, char *argv[])
 
                     if(n > 0)
                     {
-                        buffer[n] = '\0';
-
                         struct timespec ts;
 
-                        clock_gettime(CLOCK_REALTIME,
-                                    &ts);
+                        clock_gettime(CLOCK_REALTIME, &ts);
+                        buffer[n] = '\0';
 
-                        fprintf(logfile,
-                                "%d %ld.%09ld %s\n",
-                                sequence,
-                                ts.tv_sec,
-                                ts.tv_nsec,
-                                buffer);
+                        char *line =
+                            strtok(buffer, "\n");
 
-                        fflush(logfile);
+                        while(line != NULL)
+                        {
+                            if(strlen(line) > 0)
+                            {
+                                struct timespec ts;
 
-                        sequence++;
+                                clock_gettime(CLOCK_REALTIME,
+                                            &ts);
+
+                                fprintf(logfile,
+                                        "%d %ld.%09ld %s\n",
+                                        sequence,
+                                        ts.tv_sec,
+                                        ts.tv_nsec,
+                                        line);
+
+                                fflush(logfile);
+
+                                sequence++;
+                            }
+
+                            line = strtok(NULL, "\n");
+                        }
                     }
                     else if(n == 0)
                     {

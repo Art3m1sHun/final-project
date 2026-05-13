@@ -10,8 +10,9 @@ sqlite3* db_connect()
 {
     sqlite3 *db;
 
-    int rc =
-        sqlite3_open("current_session.db", &db);
+    int rc =sqlite3_open("current_session.db", &db);
+    
+    sqlite3_exec(db, "PRAGMA journal_mode=WAL;", 0, 0, 0);
 
     if(rc)
     {
