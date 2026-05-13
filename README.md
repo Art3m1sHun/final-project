@@ -169,11 +169,11 @@ Simple low-pass smoothing filters are applied:
 
 ### ECG Filter
 
-genui{"math_block_widget_always_prefetch_v2":{"content":"y = 0.95y + 0.05x"}}
+
 
 ### PPG Filter
 
-genui{"math_block_widget_always_prefetch_v2":{"content":"y = 0.90y + 0.10x"}}
+
 
 These filters reduce high-frequency noise while preserving waveform shape.
 
@@ -270,38 +270,25 @@ gcc main.c sensor_list.c database.c log.c \
 ## Sensor Client
 
 ```bash
-gcc read_sensor.c -o sensor_client -lm
+gcc read_sensor.c -o sensor -lm
 ```
 
 ---
 
 # Run
 
-## 1. Start Gateway
+## 1. Create file 
 
 ```bash
-./gateway
+makefile
 ```
 
-## 2. Start Sensor Client
+## 2. Start system
 
 ```bash
-./sensor_client <server_ip> <port>
+./bp-monitoring.sh
 ```
 
-Example:
-
-```bash
-./sensor_client 192.168.1.10 8080
-```
-
-## 3. Launch Real-Time Plot
-
-```bash
-python3 plot_data.py
-```
-
----
 
 # Database Example
 
