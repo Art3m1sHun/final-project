@@ -1,4 +1,4 @@
-# Real-Time ECG & PPG Acquisition Gateway
+# Blood Pressure Monitoring System
 
 A multi-threaded biomedical signal acquisition system written in C for Linux-based embedded platforms.
 
